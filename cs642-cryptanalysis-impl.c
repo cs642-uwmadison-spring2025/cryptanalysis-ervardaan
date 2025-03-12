@@ -6,8 +6,8 @@
 //                   performs cryptanalysis on ciphertext of different ciphers.
 //                   See associated documentation for more information.
 //
-//   Author        : *** INSERT YOUR NAME ***
-//   Last Modified : *** DATE ***
+//   Author        : *** VARDAAN KAPOOR ***
+//   Last Modified : *** 3/12/2025 ***
 //
 #include <compsci642_log.h>
 #include "cs642-cryptanalysis-support.h"
@@ -726,11 +726,11 @@ int cs642PerformSUBSCryptanalysis(char *ciphertext, int clen, char *plaintext,
                                    char best_key_log_prob[ALPHABET_SIZE+1];
                                    double computed_freq_not_four_grams[ALPHABET_SIZE] = {0};
                                       compute_letter_frequencies(computed_freq_not_four_grams);
-                                  for(int outerTry=0;outerTry<50;outerTry++)
+                                  for(int outerTry=0;outerTry<1000;outerTry++)
                                   {
                                     generate_random_key(alphabet);//generate a random key
                                     strcpy(reverseSwapString,alphabet);
-                                  for(int i=0;i<20;i++){
+                                  for(int i=0;i<400;i++){
                                    int randomFirst=rand()%26;
                                    int randomSecond=rand()%26;
                                    if(randomFirst==randomSecond){
