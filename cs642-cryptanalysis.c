@@ -109,7 +109,7 @@ int main(int argc, char *argv[]) {
       logMessage(LOG_OUTPUT_LEVEL, "cs642StudentInit succeeded");
     }
 
-    for (cipher = CIPHER_ROTX; cipher < CIPHER_UNK; cipher++) {
+    for (cipher = CIPHER_ROTX; cipher < CIPHER_UNK; cipher++) {//CIPHER_ROTX
       for (i = 0; i < CS642_CRYPTANALYSIS_TESTS; i++) {
 
         // Get the ciphertext, create space for key and plaintext
