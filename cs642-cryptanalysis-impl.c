@@ -47,6 +47,76 @@ int cs642StudentInit(void) {
 compute_expected_ngram_frequencies(expected_ngrams, &total_expected_ngrams,&totalNotUnique_expected_ngrams, 4);
   return (0);
 }
+
+
+/**
+ * @brief get and check if a particular word is present in dictionary(this word can be in form of a 4 GRAM AS WELL)
+ * @param candidatematch which is an actual word or a 4 gram we want to check if it is in the dictionary
+ * @return give a boolean value if it is found else return 0 or false
+ */
+int dictionaryIndexFinder(char *candidatematch)
+{
+    
+    int dict_size = cs642GetDictSize();//get the dictionary size from the method goven to us by professors
+
+   
+    for (int wordcount= 0; wordcount < dict_size; wordcount++)//loop through every word of dictionary as we only have indices of the dictionary
+    {
+        DictWord dict_word = cs642GetWordfromDict(wordcount);//get each word in its own struct which is defined for us by the professors
+        if (strcmp(candidatematch, dict_word.word) == 0)//check if the string representation of the word actually matches with the candidate word we want to match
+        {
+            return 1;//return true if found and hence we can break before as well-optimization done
+        }
+    }
+    return 0;
+}
+/**
+ * @brief Compute the index of implementation statistic
+ * @param plaintext The plaintext to analyze
+ * @return The index of implementation statistic
+ */
+double indexOfImplementationStatistic(char *plaintext)
+{
+    double soundWords=0.0;
+    double totalWords = 0.0;
+    char *eachWord = strtok(plaintext, " ");
+  
+    while(eachWord != NULL)
+    {
+        totalWords++;
+        if (dictionaryIndexFinder(eachWord))
+        {
+            soundWords++;
+        }
+            
+        eachWord = strtok(NULL, " ");
+    }
+
+    return soundWords / totalWords;
+}
+/**
+ * @brief check if this plaintext we get from our best key from the inner loop is actuall the one-if yes then we can apply the optimization and canbreak before
+ */
+int detectCorrectnessInPlaintext(char *text)
+{
+    double soundWords=0;
+    double totalWords = 0;
+    char *eachWord = strtok(text, " ");
+  
+    while(eachWord != NULL)
+    {
+        totalWords++;
+        if (dictionaryIndexFinder(eachWord))
+        {
+            soundWords++;
+        }
+            
+        eachWord = strtok(NULL, " ");
+    }
+
+    return (soundWords==totalWords)?1:0;//check if the actual matched words =the actual found words(this can only happen once in theoretical sense when we get actual plaintext)
+}
+
 /**
  * @brief Compute the frequency of each letter in the dictionary
  * @param computed_freq The array to store the frequency of each letter
@@ -157,6 +227,38 @@ double compute_chi_squared(double *computed_freq,int freq[ALPHABET_SIZE], int to
     }
    //printf("count is %d\n",count);
     return chi_sq==0?DBL_MAX:chi_sq;
+}
+double compute_chi_square_4gram_version2(FourGramEntry *observed_ngrams,
+  int total_number_seen, char* plaintext)
+{
+double prob = 0.0;//initialize the probability to 0
+
+
+for (int i = 0; i < total_number_seen; i++)
+{
+char *obsNgram = observed_ngrams[i].ngram;
+double obsFreq = observed_ngrams[i].frequency; 
+double expectedF = 0.0;//initialize the expected frequency to 0
+int foundGram = 0;//initialize the foundGram to 0
+for (int j = 0; j < total_expected_ngrams; j++)
+{
+if (strcmp(obsNgram, expected_ngrams[j].ngram) == 0)
+{
+expectedF = expected_ngrams[j].count;
+foundGram = 1;//set the foundGram to 1 as we have found this 4-gram in the hash map
+break;//break the loop as we have found this 4-gram in the hash map
+}
+}
+if (!foundGram)//if we don't find this 4-gram in the hash map
+{
+expectedF = 1e-9;//set the expected frequency to a very small value
+}
+
+
+prob += obsFreq * log(expectedF);
+}
+prob += indexOfImplementationStatistic(plaintext);
+return prob;
 }
 // double perform_chi_square_test(const char *plaintext) {
 //   FourGramEntry observed_ngrams[MAX_NGRAMS];
@@ -294,6 +396,7 @@ void decrypt_vigenere(char *ciphertext, int clen, char *plaintext, int keylen, c
   }
   plaintext[clen] = '\0'; // Null-terminate plaintext
 }
+
 int getVigenereKey(char *ciphertext, int clen, char *plaintext,
   int plen, char *key)
   {
@@ -345,6 +448,14 @@ int getVigenereKey(char *ciphertext, int clen, char *plaintext,
   //POINT H
   return best_guess;//return the best guess
   }
+  /**
+   * @brief Split the ciphertext into columns
+   * @param ciphertext The ciphertext to split
+   * @param clen The length of the ciphertext
+   * @param keySize The size of the key
+   * @param columns The array to store the columns
+   * @return void
+   */
   void split_ciphertext_into_columns(char *ciphertext, int clen, int keySize, char columns[][clen]) {
     for (int i = 0; i < keySize; i++) {
       columns[i][0] = '\0';  // Null terminate to start empty
@@ -357,6 +468,15 @@ int getVigenereKey(char *ciphertext, int clen, char *plaintext,
       columns[col_index][len + 1] = '\0';  // Null terminate
   }
 }
+
+/**
+ * @brief get a particular column 
+ * @param ciphertext The ciphertext to split
+ * @param clen The length of the ciphertext
+ * @param keySize The size of the key
+ * @param columns The array to store the columns
+ * @return void
+ */
 void getCandidateKeyColumns(char *ciphertext, int clen, int keySize, char columns[][clen / keySize + 1]) {
 int currentRow = 0;
 for (int i = 0; i < clen; i++) {
@@ -388,7 +508,12 @@ k0Value += freqArray[i] * (freqArray[i] - 1);
 k0Value = k0Value / (length * (length - 1));
 return k0Value;
 }
-//perform friedman to estimate key length
+/**
+ * @brief Perform Friedman test to find the key length
+ * @param ciphertext The ciphertext to analyze
+ * @param clen The length of the ciphertext
+ * @pretun The best key length
+ */
 int performFT(char *ciphertext, int clen) {
 double bestAvgValue = 0.0;
 double bestKeyLength = 6;
@@ -405,7 +530,7 @@ bestAvgValue = sum;
 bestKeyLength = keySize;
 }
 }
-//try key lengths from 6 - 11
+
 return bestKeyLength;
 }
 void computeExpectedFrequencies(double exepectedFrequency[26]) {
@@ -425,7 +550,7 @@ totalLetters++;
 }
 }
 }
-//convert counts to probabilities (percentage)
+
 for (int i = 0; i < 26; i++) {
 exepectedFrequency[i] = (totalLetters > 0) ? (letterCounts[i] * 100.0 / totalLetters) : 0.0;
 }
@@ -508,29 +633,29 @@ void decryptIthColumn(char *column, int length, int *candidateOffset) {
   computeDictFreq(dictionaryFrequencies);
   for (int candidateShift = 0; candidateShift < 26; candidateShift++) {
     int characterCounter[26] = {0};
-    //count letter frequencies in shifted texts
+   
     for (int i = 0; i < length; i++) {
       if (column[i]!=' ') {
         char changedChar = ((column[i] - 'A' - candidateShift + 26) % 26) + 'A';
         characterCounter[changedChar - 'A']++;
       }
   }
-    //compute chi-squared score
+ 
     double chiSquared = 0.0;
     for (int i = 0; i < 26; i++) {
       double seenFreq = characterCounter[i];
-      double hypothesisValue = dictionaryFrequencies[i] * length / 100.0; //since it was a percent earlier
+      double hypothesisValue = dictionaryFrequencies[i] * length / 100.0; 
       if (hypothesisValue > 0) {
         chiSquared += ((seenFreq - hypothesisValue) * (seenFreq - hypothesisValue) / hypothesisValue);
       }
     }
-    //select shift with lowest chi-square value
+   
     if (chiSquared < bestChiSquared) {
       bestChiSquared = chiSquared;
       bestOffset = candidateShift;
     }
   }
-  *candidateOffset = bestOffset; //store best shift
+  *candidateOffset = bestOffset; 
 }
 
 int cs642PerformVIGECryptanalysis(char *ciphertext, int clen, char *plaintext,
@@ -578,9 +703,9 @@ void compute_expected_ngram_frequencies(NGramFreq *freqTable, int *total_ngrams,
       for (int j = 0; j <= len - n; j++) {
           char ngram[MAX_N + 1] = {0};
           strncpy(ngram, word + j, n);
-          ngram[n] = '\0';  // Null-terminate
+          ngram[n] = '\0';  
           (*totalNotUnique_expected_ngrams)+=word_freq;
-          // Search if n-gram exists in the table
+         
           int found = 0;
           for (int k = 0; k < *total_ngrams; k++) {
               if (strcmp(freqTable[k].ngram, ngram) == 0) {
@@ -589,7 +714,7 @@ void compute_expected_ngram_frequencies(NGramFreq *freqTable, int *total_ngrams,
                   break;
               }
           }
-          // If new n-gram, add to table
+          
           if (!found && *total_ngrams < MAX_NGRAMS) {
               strcpy(freqTable[*total_ngrams].ngram, ngram);
               freqTable[*total_ngrams].count = word_freq;
@@ -689,18 +814,18 @@ double compute_log_probability(FourGramEntry *observed_ngrams, int total_observe
  * @param key The key to generate
  * @return 0 if successful, -1 if failure
  */
-int generate_random_key(char *key) {
-  for(int i=0;i<ALPHABET_SIZE;i++)
+int generate_random_key(char *key) {//this function generates a random key for the substitution cipher
+  for(int i=0;i<ALPHABET_SIZE;i++)//loop through the alphabet size
   {
-    key[i]=i+'A';
+    key[i]=i+'A';//set the key to the alphabet
   }
-  for(int i=0;i<ALPHABET_SIZE;i++)
+  for(int i=0;i<ALPHABET_SIZE;i++)//loop through the alphabet size
   {
-    int j=rand()%ALPHABET_SIZE;
-    swap2Positions(key,i,j);
+    int j=rand()%ALPHABET_SIZE;//generate a random number between 0 and 25
+    swap2Positions(key,i,j);//swap the two positions in the key
   }
-  key[ALPHABET_SIZE]='\0';
-  return 0;
+  key[ALPHABET_SIZE]='\0';//set the last character of the key to null
+  return 0;//return 0
 }
 /**
  * @brief Perform cryptanalysis on a substitution cipher
@@ -711,79 +836,103 @@ int generate_random_key(char *key) {
  * @param key The place to put the key in
  * @return 0 if successful, -1 if failure
  */
+
 int cs642PerformSUBSCryptanalysis(char *ciphertext, int clen, char *plaintext,
-                                  int plen, char *key) {
-                                    char alphabet[ALPHABET_SIZE+1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-                                    alphabet[ALPHABET_SIZE+1]='\0';
-                                    char reverseSwapString[ALPHABET_SIZE+1];
-                                    reverseSwapString[ALPHABET_SIZE+1]='\0';
-                                   //make a placeholder which stores best plaintext we get so it should be of length one more than plaintext string
-                                   char best_plaintext[plen+1];
-                                   //make a placeholder which stores best key we get so it should be of length one more than key string
-                                   char best_key[ALPHABET_SIZE+1];
-                                   double best_chi_sq = DBL_MAX;
-                                   double bestLogProb= 0.0-DBL_MAX;
-                                   char best_key_log_prob[ALPHABET_SIZE+1];
-                                   double computed_freq_not_four_grams[ALPHABET_SIZE] = {0};
-                                      compute_letter_frequencies(computed_freq_not_four_grams);
-                                  for(int outerTry=0;outerTry<1000;outerTry++)
-                                  {
-                                    generate_random_key(alphabet);//generate a random key
-                                    strcpy(reverseSwapString,alphabet);
-                                  for(int i=0;i<400;i++){
-                                   int randomFirst=rand()%26;
-                                   int randomSecond=rand()%26;
-                                   if(randomFirst==randomSecond){
-                                    randomFirst=rand()%26;
-                                   }
-                                   swap2Positions(alphabet,randomFirst,randomSecond);
-                                   strcpy(key,alphabet);
-                                    cs642Decrypt(CIPHER_SUBS, key, ALPHABET_SIZE, plaintext, plen, ciphertext, clen);//get pertaining plaintext for this candidate key
-                                    int freq_not_using_four_grams[ALPHABET_SIZE];
-                                            int total_letters;
-                                            compute_ciphertext_frequencies(plaintext, clen, freq_not_using_four_grams, &total_letters);
-                                            double chi_sq_not_using_four_grams = compute_chi_squared(computed_freq_not_four_grams,freq_not_using_four_grams, total_letters);
-                                    char copy[plen];  // Ensure copy has enough space
-                                    strcpy(copy, plaintext);
-                                    extractFourGrams(plaintext);//extract 4-grams from the plaintext we got from the candidate key
-                                    double storeLogValue=applyLogProbability();//apply log probability to the 4-grams we got from the candidate plaintext
-                                    if(storeLogValue>bestLogProb){
-                                      strcpy(best_key_log_prob,key);
-                                      bestLogProb=storeLogValue;
-                                    }
-                                    for(int j=0;j<fourGramCount;j++)
-                                    {
-                                      fourGrams[j].frequency=fourGrams[j].frequency/countPlaintextFourGrams;
-                                    }
-                                    double chiSquareValue= compute_chi_square_4gram(fourGrams, fourGramCount);
-                                 // TODO: a remembering mechanism by which we can actually store the best key we have found till yet and can undo any swap which we did for a previous key which gave us a greater chi square value
-                                    if(i==0){
-                                      strcpy(best_plaintext, copy);
-                                      strcpy(best_key, key);
-                                      strcpy(reverseSwapString,key);
-                                    }
-                                    else{
-                                      if(chiSquareValue<best_chi_sq){
-                                      // if(chi_sq_not_using_four_grams<best_chi_sq){
-                                        strcpy(best_plaintext, copy);
-                                        strcpy(best_key, key);
-                                        best_chi_sq=chi_sq_not_using_four_grams;
-                                      }
-                                    }
-                                  memset(fourGrams, '\0', sizeof(fourGrams));
-                                      fourGramCount=0;
-                                      countPlaintextFourGrams=0;
-                                    }
-                                  }
-                                    strcpy(key, best_key);
-                                    cs642Decrypt(CIPHER_SUBS, key, ALPHABET_SIZE, plaintext, plen, ciphertext, clen);
-                                    printf("plaitext from this best key is %s\n",plaintext);
-                                    printf("best key is %s\n",best_key);
-                                    printf("best key from log value is %s\n",best_key_log_prob);
-                                    printf("greatest log value is %f\n",bestLogProb);
-                                    // Return successfully
-                                    return (0);
+  int plen, char *key)
+{
+int countTotalFourGrams = 0;
+
+char alphabetStore[ALPHABET_SIZE + 1] = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+
+char best_plaintext[plen + 1];
+
+char best_key[ALPHABET_SIZE + 1];//stores the best key found
+char best_key_found_in_outside_loop[ALPHABET_SIZE + 1];//stores the best key found in the outer loop
+char prev_key_to_undo_changes[ALPHABET_SIZE + 1];//stores the key before we make any changes to the key
+double best_chi_sq = -DBL_MAX;//stores the best chi square value found
+double best_chi_sq_found_in_outer_loop = -DBL_MAX;//stores the best chi square value found in the outer loop
+int found=0;//flag to check if we have found the correct key or not
+
+strcpy(key, alphabetStore);//copy the alphabet to the key
+int inner_number_of_loops = 0;//stores the number of inner loops
+while(found==0){//till we have not found the correct key
+char temp_string_cipher[clen];//temporary string to store the ciphertext
+strcpy(temp_string_cipher, ciphertext);//copy the ciphertext to the temporary string
+generate_random_key(key);//generate a random key
+best_chi_sq = -DBL_MAX;//set the best chi square value to the minimum value
+
+while (inner_number_of_loops< 5000)//till we have not reached the maximum number of inner loops
+{
+  
+strcpy(prev_key_to_undo_changes, key);//copy the key to the previous key to undo the changes
+
+int randomFirst = rand() % 26;
+int randomSecond = rand() % 26;
+if (randomFirst == randomSecond)
+{
+randomFirst = rand() % 26;//generate a random number between 0 and 25
 }
+
+swap2Positions(key, randomFirst, randomSecond);//swap the two positions in the key
+  
+
+cs642Decrypt(CIPHER_SUBS, key, ALPHABET_SIZE, plaintext, plen, ciphertext, clen); //decrypt the ciphertext using the key we have generated
+char temp_plaintext_to_regenerate_plaintext[plen + 1];//temporary string to store the plaintext
+strcpy(temp_plaintext_to_regenerate_plaintext, plaintext);//copy the plaintext to the temporary string
+extractFourGrams(temp_plaintext_to_regenerate_plaintext);//extract 4-grams from the plaintext
+strcpy(temp_plaintext_to_regenerate_plaintext, plaintext);//copy the plaintext to the temporary string
+
+
+
+for (int j = 0; j < fourGramCount; j++)//loop through the 4-grams we have extracted from the plaintext
+{
+fourGrams[j].frequency /= countPlaintextFourGrams;//divide the frequency of the 4-gram by the total number of 4-grams in the plaintext
+}
+strcpy(temp_plaintext_to_regenerate_plaintext, plaintext);//copy the plaintext to the temporary string
+double chiSquareValue = compute_chi_square_4gram_version2(fourGrams, fourGramCount, temp_plaintext_to_regenerate_plaintext);//compute the chi square value for the 4-grams we have extracted from the plaintext
+//THIS FUNCTION DOES LOG PROABBILITY METHOD(CHI SQUARED METHOD DIDN'T WORK FOR ME SO I CHANGED TO LOG PROBABILITY METHOD)
+if (chiSquareValue > best_chi_sq)//if the chi square value is greater than the best chi square value found
+{
+strcpy(best_plaintext, temp_plaintext_to_regenerate_plaintext);//copy the plaintext to the best plaintext
+strcpy(best_key, key); //copy the key to the best key
+best_chi_sq = chiSquareValue;//set the best chi square value to the chi square value
+}
+else//if the chi square value is not greater than the best chi square value found
+{
+inner_number_of_loops++;
+strcpy(key, prev_key_to_undo_changes);
+}
+
+memset(fourGrams, '\0', sizeof(fourGrams));//set the 4-grams to null
+
+fourGramCount = 0;//set the count of the 4-grams to 0
+countPlaintextFourGrams = 0;//set the count of the 4-grams in the plaintext to 0
+}
+inner_number_of_loops = 0;//RESETTING THE INNER LOOP TO 0 AS WE HAVE TILL 5000 SO SETTING FOR THE NEXT CIRCLE OF ITERATIONS
+
+if (best_chi_sq > best_chi_sq_found_in_outer_loop)//if the best chi square value is greater than the best chi square value found in the outer loop
+{
+best_chi_sq_found_in_outer_loop = best_chi_sq;//set the best chi square value found in the outer loop to the best chi square value
+strcpy(best_key_found_in_outside_loop, best_key);
+
+
+if(detectCorrectnessInPlaintext(best_plaintext))//if the plaintext is correct
+{
+  found=1;//SET THE FLAG TO 1 ACTUALLY AND NOW WE CAN BREAK AND CAN DIRECTLY RETURN-THIS IS OPTIMIZATION WHERE WE DON'T RUN EVERY SCENARIO FOR SAME AMOUNT OF TIME
+  strcpy(plaintext, best_plaintext);//  copy the best plaintext to the plaintext
+  strcpy(key,best_key);//copy the best key to the key
+  break;//break the loop-INNER LOOP IS BROKEN
+}
+}
+
+}
+
+cs642Decrypt(CIPHER_SUBS, key, ALPHABET_SIZE, plaintext, plen, ciphertext, clen);//decrypt the ciphertext using the key we have found
+return (0);
+}
+
+
+
 ////////////////////////////////////////////////////////////////////////////////
 //
 // Function     : cs642StudentCleanUp
